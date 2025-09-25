@@ -1,2 +1,6 @@
-# ImageFollowMouse-paricles
-图片移动漂移到鼠标位置＆粒子效果库
+ImageFollowMouse-paricles 图片移动漂移到鼠标位置＆粒子效果库
+
+目前做了:
+图片漂移到鼠标指针(加上图片长宽偏移所以图片漂移到正中心)
+粒子效果
+设置界面UI和注意事项
