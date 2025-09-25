@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="zh">
+
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta charset="utf-8">
+    <title>HTML file</title>
+</head>
+
+<body>
+    <img id="target" style="position: absolute;" src="image.png" alt="null">
+
+    <canvas id="canvas"></canvas>
+
+    <div id="oprateArea">
+        <div id="box">
+            <p><strong>注: </strong></p>
+            <p>CLS增加是正常的, 因为图片高频率, 大距离的移动导致判断成布局偏移(F12开发者工具 dev-tool 内查看性能 performance)</p>
+            <p>帧率同样决定了操作和刷新的速度(只做了同步的)<s>懒(雾</s></p>
+            <p>图片移动速度是 距离 / 倍数, 每次刷新计算一次</p>
+            <p>粒子消失高度是 高度 / 消失高度比例, 高度以浏览器标签页 window.inner 为定</p>
+            <p>粒子效果不要开太多, 不然炸了qwq</p>
+        </div>
+
+        <div id="largeInterval"></div>
+
+        <div id="box">
+            <p>帧率: <strong id="framePerSecondText">null</strong></p>
+            <input id="framePerSecond" type="range" value="60" min="1" max="60">
+
+            <div id="interval"></div>
+
+            <p>图片是否移动: <input id="imageFreeze" type="checkbox" checked></p>
+            <p>图片是否隐藏: <input id="imageHide" type="checkbox" onclick="imageHiddenOrShow()"></p>
+            <p>图片移动速度: <strong id="imageMoveSpeedText">null</strong></p>
+            <input id="imageMoveSpeedBar" type="range" value="20" min="0" max="100">
+
+            <div id="interval"></div>
+
+            <p>启用粒子效果: <input id="doParticles" type="checkbox" checked></p>
+            <p>粒子数量: <strong id="particlesNumText">null</strong></p>
+            <input id="particlesNum" type="range" value="10" min="0">
+            <p>粒子大小: <strong id="particlesSizeText">null</strong></p>
+            <input id="particlesSize" type="range" value="10" min="0">
+            <p>粒子速度: <strong id="particlesSpeedText">null</strong></p>
+            <input id="particlesSpeed" type="range" value="2" min="0">
+            <p>粒子消失高度: <strong id="particlesTargetYWindowRatioText">null</strong></p>
+            <input id="particlesTargetYWindowRatio" type="range" value="30" min="0">
+            <p>粒子屏幕底部基本间隔: <strong id="particlesBottomYOffsetText">null</strong></p>
+            <input id="particlesBottomYOffset" type="range" value="50" min="0">
+            <p>粒子屏幕底部随机间隔: <strong id="particlesBottomYRandomRangeText">null</strong></p>
+            <input id="particlesBottomYRandomRange" type="range" value="30" min="0">
+        </div>
+    </div>
+</body>
+<style>
+    * {
+        padding: 0;
+        margin: 0;
+        overflow: hidden;
+    }
+
+    #oprateArea {
+        position: absolute;
+        z-index: 2;
+        top: 0;
+        left: 0;
+        padding: 20px;
+    }
+
+    #box {
+        width: max-content;
+        padding: 20px;
+        background-color: rgba(100, 100, 100, 0.15);
+    }
+
+    #interval {
+        height: 10px;
+    }
+
+    #largeInterval {
+        height: 20px;
+    }
+</style>
+<script>
+    const framePerSecondDOM = document.getElementById("framePerSecond");
+    const framePerSecondTextDOM = document.getElementById("framePerSecondText");
+
+    let framePerSecond = 20;
+    let framePerSecondInMilliecond = 250;
+
+    function framePerSecondSetDOM() {
+        framePerSecond = framePerSecondDOM.value;
+        framePerSecondInMilliecond = Math.floor(1000 / framePerSecond);
+
+        framePerSecondTextDOM.innerHTML = framePerSecond + " FPS (" + framePerSecondInMilliecond + "毫秒)";
+    }
+
+    function loop() {
+        // 图片
+        if (!hideImage) {
+            if (imageFreezeDOM.checked) {
+                setImagePositionOffset();
+                setImageXY();
+                reFreshImagePosition();
+            }
+        }
+
+        // 粒子
+        if (doParticlesDOM.checked) {
+            particles();
+        }
+
+        setTimeout(() => {
+            loop();
+        }, framePerSecondInMilliecond);
+    }
+
+    setInterval(() => {
+       framePerSecondSetDOM();
+       imageMoveSpeedSetDOM();
+       particlesSetDOM();
+    }, 20);
+
+    // 背景粒子效果
+
+    const canvas = document.getElementById("canvas");
+    const ctx = canvas.getContext("2d");
+
+    const doParticlesDOM = document.getElementById("doParticles");
+
+    const particlesNumDOM = document.getElementById("particlesNum");
+    const particlesSizeDOM = document.getElementById("particlesSize");
+    const particlesSpeedDOM = document.getElementById("particlesSpeed");
+    const particlesTargetYWindowRatioDOM = document.getElementById("particlesTargetYWindowRatio");
+    const particlesBottomYOffsetDOM = document.getElementById("particlesBottomYOffset");
+    const particlesBottomYRandomRangeDOM = document.getElementById("particlesBottomYRandomRange");
+
+    const particlesNumTextDOM = document.getElementById("particlesNumText");
+    const particlesSizeTextDOM = document.getElementById("particlesSizeText");
+    const particlesSpeedTextDOM = document.getElementById("particlesSpeedText");
+    const particlesTargetYWindowRatioTextDOM = document.getElementById("particlesTargetYWindowRatioText");
+    const particlesBottomYOffsetTextDOM = document.getElementById("particlesBottomYOffsetText");
+    const particlesBottomYRandomRangeTextDOM = document.getElementById("particlesBottomYRandomRangeText");
+
+    let windowHeight, windowWidth;
+
+    let particleTopYOffset;
+
+    let particlesSetsSpeed = [];
+    let particlesSetsDuration = [];
+    let particlesSetsStartDuration = [];
+    let particlesSetsDurationLeftRatio = [];
+    let particlesSetsSize = [];
+    let particlesSetsX = [];
+    let particlesSetsY = [];
+    let particlesSetsTargetY = [];
+    let particlesSetsBottomOffset = [];
+
+    let particlesRandomSpeed = 20;
+    let particlesRandomDurationRange = 200;
+    let particlesBasicDurationRange = 100;
+
+    let particlesNum = 10;
+    let particlesStartSize = 10;
+    let particlesSpeed = 1;
+
+    let particlesBottomYRandomRange = 30;
+    let particlesBottomYOffset = 50;
+
+    let particlesTargetYWindowRatio = 30;
+    let particlesTargetYRandomRange = 100;
+
+    let particlesMaximumNum = 200;
+    let particlesMaximumSpeed = 10;
+    let particlesMaximumStartSize = 100;
+    let particlesMaximumBottomYRandomRange = 30;
+    let particlesMaximumBottomYOffset = 50;
+
+    let particlesMaximumTargetYWindowRatio = 100;
+
+    function particlesInitDOMValue() {
+        particlesNumDOM.max = particlesMaximumNum;
+        particlesSizeDOM.max = particlesMaximumStartSize;
+        particlesSpeedDOM.max = particlesMaximumSpeed;
+        particlesBottomYRandomRangeDOM.max = particlesMaximumBottomYRandomRange;
+        particlesBottomYOffsetDOM.max = particlesMaximumBottomYOffset;
+
+        particlesTargetYWindowRatioDOM.max = particlesMaximumTargetYWindowRatio;
+    }
+
+    function particlesSetDOM() {
+        // 很神奇诶 获取DOM为字符串
+
+        particlesNum = parseInt(particlesNumDOM.value);
+        particlesStartSize = parseInt(particlesSizeDOM.value);
+        particlesSpeed = parseInt(particlesSpeedDOM.value);
+        particlesTargetYWindowRatio = parseInt(particlesTargetYWindowRatioDOM.value);
+        particlesBottomYOffset = parseInt(particlesBottomYOffsetDOM.value);
+        particlesBottomYRandomRange = parseInt(particlesBottomYRandomRangeDOM.value);
+
+        particlesNumTextDOM.innerHTML = particlesNum;
+        particlesSizeTextDOM.innerHTML = particlesStartSize + " px";
+        particlesSpeedTextDOM.innerHTML = particlesSpeed;
+        particlesTargetYWindowRatioTextDOM.innerHTML = particlesTargetYWindowRatio + "%";
+        particlesBottomYOffsetTextDOM.innerHTML = particlesBottomYOffset + " px";
+        particlesBottomYRandomRangeTextDOM.innerHTML = particlesBottomYRandomRange + " px";
+    }
+
+    function setParticlesTargetY(num) {
+        particlesSetsTargetY[num] = Math.floor((particlesTargetYWindowRatio / 100) * windowHeight) + Math.floor(Math.random() * particlesTargetYRandomRange);
+    }
+
+    function setCanvasHeightWidth() {
+        windowWidth = window.innerWidth;
+        windowHeight = window.innerHeight;
+
+        canvas.width = windowWidth;
+        canvas.height = windowHeight;
+    }
+
+    function particlesInit() {
+        for (let i = 0; i < particlesMaximumNum; i++) {
+            setParticlesNull(i);
+        }
+        for (let i = 0; i < particlesNum; i++) {
+            setParticles(i);
+        }
+    }
+
+    function setParticlesNull(num) {
+        particlesSetsSpeed[num] = 0;
+        particlesSetsDuration[num] = 0;
+        particlesSetsStartDuration[num] = 0;
+        particlesSetsSize[num] = 0;
+        particlesSetsBottomOffset[num] = 0;
+
+        particlesSetsX[num] = 0;
+        particlesSetsY[num] = 0;
+    }
+
+    function setParticles(num) {
+        particlesSetsSpeed[num] = Math.floor(Math.random() * particlesRandomSpeed);
+        particlesSetsDuration[num] = Math.floor(particlesBasicDurationRange + (Math.random() * particlesRandomDurationRange));
+        particlesSetsStartDuration[num] = particlesSetsDuration[num];
+        particlesSetsSize[num] = particlesStartSize;
+
+        setParticlesXY(num);
+    }
+
+    function setParticlesXY(num) {
+        setParticlesTargetY(num);
+
+        particlesSetsBottomOffset[num] = particlesBottomYOffset + Math.floor(Math.random() * particlesBottomYRandomRange);
+
+        particlesSetsX[num] = Math.floor(Math.random() * windowWidth);
+        particlesSetsY[num] = windowHeight - particlesSetsBottomOffset[num];
+    }
+
+    function particles() {
+        ctx.fillStyle = "#e8e8e8";
+        ctx.fillRect(0, 0, windowWidth, windowHeight);
+
+        for (let i = 0; i < particlesNum; i++) {
+            if (particlesSetsDuration[i] <= 0) {
+                setParticles(i);
+            }
+
+            ctx.fillStyle = "#101010";
+            ctx.fillRect(particlesSetsX[i], particlesSetsY[i], particlesSetsSize[i], particlesSetsSize[i]);
+
+            particlesSetsDurationLeftRatio[i] = particlesSetsDuration[i] / particlesSetsStartDuration[i];
+
+            particlesSetsSize[i] = Math.floor(particlesStartSize * particlesSetsDurationLeftRatio[i]);
+            particlesSetsY[i] = windowHeight - Math.floor((1 - particlesSetsDurationLeftRatio[i]) * particlesSetsTargetY[i]) - particlesSetsBottomOffset[i];
+
+            particlesSetsDuration[i] -= particlesSpeed;
+        }
+    }
+
+    window.onresize = () => {
+        setCanvasHeightWidth();
+    }
+
+    // 图片移动漂移
+
+    const image = document.getElementById("target");
+
+    const imageMoveSpeedTextDOM = document.getElementById("imageMoveSpeedText");
+    const imageMoveSpeedBarDOM = document.getElementById("imageMoveSpeedBar");
+    const imageFreezeDOM = document.getElementById("imageFreeze");
+
+    let imageHeight, imageWidth
+    let imageWidthOffset, imageHeightOffset;
+
+    let mouseX = 0, mouseY = 0;
+
+    let imagePositionX = 0, imagePositionY = 0;
+    let imageTargetX = 0, imageTargetY = 0;
+    let imagePositionXOffset = 0, imagePositionYOffset = 0;
+
+    let imageMoveSpeedDivide = 0.2;
+
+    let hideImage = false;
+
+    function imageHiddenOrShow() {
+        if (hideImage) {
+            hideImage = false;
+            image.hidden = false;
+        } else {
+            hideImage = true;
+            image.hidden = true;
+        }
+    }
+
+    function getXY(event) {
+        mouseX = event.clientX;
+        mouseY = event.clientY;
+
+        imageTargetX = mouseX - imageWidthOffset;
+        imageTargetY = mouseY - imageHeightOffset;
+    }
+
+    function setImagePositionOffset() {
+        imagePositionXOffset = Math.round(imageMoveSpeedDivide * (imageTargetX - imagePositionX));
+        imagePositionYOffset = Math.round(imageMoveSpeedDivide * (imageTargetY - imagePositionY));
+    }
+
+    function setImageXY() {
+        imagePositionX += imagePositionXOffset;
+        imagePositionY += imagePositionYOffset;
+    }
+
+    function reFreshImagePosition() {
+        image.style.left = imagePositionX + "px";
+        image.style.top = imagePositionY + "px";
+    }
+
+    function imageMoveSpeedSetDOM() {
+        imageMoveSpeedDivide = imageMoveSpeedBarDOM.value / 100;
+        imageMoveSpeedTextDOM.innerHTML = imageMoveSpeedDivide;
+    }
+
+    window.onmousemove = (event) => {
+        if (imageFreezeDOM.checked) {
+            getXY(event);
+        }
+    }
+
+    image.onload = () => {
+        imageHeight = image.height;
+        imageWidth = image.width;
+
+        imageWidthOffset = Math.round(imageWidth / 2);
+        imageHeightOffset = Math.round(imageHeight / 2);
+
+        // 初始化
+        setCanvasHeightWidth();
+        particlesInit();
+        particlesInitDOMValue();
+
+        loop();
+    }
+</script>
+
+</html>
