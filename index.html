@@ -292,7 +292,7 @@
         if (debug) {
             ctx.fillStyle = "#00c400";
             ctx.fillRect(0, (windowHeight - particlesBottomYOffset), windowWidth, 5);
-            ctx.fillRect(0, (windowHeight - particlesBottomYRandomRange), windowWidth, 5);
+            ctx.fillRect(0, (windowHeight - particlesBottomYRandomRange - particlesBottomYOffset), windowWidth, 5);
 
             ctx.fillRect(0, (windowHeight - Math.floor(windowHeight * (particlesTargetYWindowRatio / 100))), windowWidth, 5);
         }
