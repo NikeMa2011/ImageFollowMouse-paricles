@@ -182,7 +182,6 @@
     let particlesBottomYOffset = 50;
 
     let particlesTargetYWindowRatio = 30;
-    let particlesTargetYRandomRange = 100;
 
     let particlesMaximumNum = 200;
     let particlesMaximumSpeed = 10;
@@ -221,7 +220,7 @@
     }
 
     function setParticlesTargetY(num) {
-        particlesSetsTargetY[num] = Math.floor((particlesTargetYWindowRatio / 100) * windowHeight) + Math.floor(Math.random() * particlesTargetYRandomRange);
+        particlesSetsTargetY[num] = Math.floor((particlesTargetYWindowRatio / 100) * windowHeight);
     }
 
     function setCanvasHeightWidth() {
@@ -296,7 +295,6 @@
             ctx.fillRect(0, (windowHeight - particlesBottomYRandomRange), windowWidth, 5);
 
             ctx.fillRect(0, (windowHeight - Math.floor(windowHeight * (particlesTargetYWindowRatio / 100))), windowWidth, 5);
-            ctx.fillRect(0, (windowHeight - particlesTargetYRandomRange), windowWidth, 5);
         }
     }
 
