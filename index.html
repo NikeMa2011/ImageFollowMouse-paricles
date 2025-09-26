@@ -8,7 +8,10 @@
 </head>
 
 <body>
-    <img id="target" style="position: absolute;" src="image.png" alt="null">
+    <div>
+        <p id="imagePositionText" style="position: absolute;" hidden></p>
+        <img id="target" style="position: absolute;" src="image.png" alt="null">
+    </div>
 
     <canvas id="canvas"></canvas>
 
@@ -50,6 +53,10 @@
             <input id="particlesBottomYOffset" type="range" value="50" min="0">
             <p>粒子屏幕底部随机间隔: <strong id="particlesBottomYRandomRangeText">null</strong></p>
             <input id="particlesBottomYRandomRange" type="range" value="30" min="0">
+
+            <div id="interval"></div>
+
+            <p>调试模式: <input id="debugMode" type="checkbox"></p>
         </div>
     </div>
 </body>
@@ -86,6 +93,10 @@
     const framePerSecondDOM = document.getElementById("framePerSecond");
     const framePerSecondTextDOM = document.getElementById("framePerSecondText");
 
+    const debugModeDOM = document.getElementById("debugMode");
+
+    let debug = false;
+
     let framePerSecond = 20;
     let framePerSecondInMilliecond = 250;
 
@@ -94,6 +105,8 @@
         framePerSecondInMilliecond = Math.floor(1000 / framePerSecond);
 
         framePerSecondTextDOM.innerHTML = framePerSecond + " FPS (" + framePerSecondInMilliecond + "毫秒)";
+
+        debug = debugModeDOM.checked;
     }
 
     function loop() {
@@ -102,7 +115,7 @@
             if (imageFreezeDOM.checked) {
                 setImagePositionOffset();
                 setImageXY();
-                reFreshImagePosition();
+                reFreshImageAndDebugDOMPosition();
             }
         }
 
@@ -174,8 +187,8 @@
     let particlesMaximumNum = 200;
     let particlesMaximumSpeed = 10;
     let particlesMaximumStartSize = 100;
-    let particlesMaximumBottomYRandomRange = 30;
-    let particlesMaximumBottomYOffset = 50;
+    let particlesMaximumBottomYRandomRange = 100;
+    let particlesMaximumBottomYOffset = 200;
 
     let particlesMaximumTargetYWindowRatio = 100;
 
@@ -276,6 +289,15 @@
 
             particlesSetsDuration[i] -= particlesSpeed;
         }
+
+        if (debug) {
+            ctx.fillStyle = "#00c400";
+            ctx.fillRect(0, (windowHeight - particlesBottomYOffset), windowWidth, 5);
+            ctx.fillRect(0, (windowHeight - particlesBottomYRandomRange), windowWidth, 5);
+
+            ctx.fillRect(0, (windowHeight - Math.floor(windowHeight * (particlesTargetYWindowRatio / 100))), windowWidth, 5);
+            ctx.fillRect(0, (windowHeight - particlesTargetYRandomRange), windowWidth, 5);
+        }
     }
 
     window.onresize = () => {
@@ -289,6 +311,8 @@
     const imageMoveSpeedTextDOM = document.getElementById("imageMoveSpeedText");
     const imageMoveSpeedBarDOM = document.getElementById("imageMoveSpeedBar");
     const imageFreezeDOM = document.getElementById("imageFreeze");
+
+    const imagePositionTextDOM = document.getElementById("imagePositionText");
 
     let imageHeight, imageWidth
     let imageWidthOffset, imageHeightOffset;
@@ -331,14 +355,24 @@
         imagePositionY += imagePositionYOffset;
     }
 
-    function reFreshImagePosition() {
+    function reFreshImageAndDebugDOMPosition() {
         image.style.left = imagePositionX + "px";
         image.style.top = imagePositionY + "px";
+
+        imagePositionTextDOM.style.left = imagePositionX + "px";
+        imagePositionTextDOM.style.top = (imagePositionY - imagePositionTextDOM.offsetHeight - 5) + "px";
     }
 
     function imageMoveSpeedSetDOM() {
         imageMoveSpeedDivide = imageMoveSpeedBarDOM.value / 100;
         imageMoveSpeedTextDOM.innerHTML = imageMoveSpeedDivide;
+
+        if (debug) {
+            imagePositionTextDOM.innerText = "imagePositionX = " + imagePositionX + "px, imagePositionY: " + imagePositionY + "px";
+            imagePositionTextDOM.hidden = false;
+        } else {
+            imagePositionTextDOM.hidden = true;
+        }
     }
 
     window.onmousemove = (event) => {
@@ -347,7 +381,7 @@
         }
     }
 
-    image.onload = () => {
+    image.onload = () => {  
         imageHeight = image.height;
         imageWidth = image.width;
 
